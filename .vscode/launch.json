@@ -1,0 +1,14 @@
+{
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Spring Boot-MovieExplorerApplication<movieexplorer>",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/server",
+      "mainClass": "com.abhishek.movieexplorer.MovieExplorerApplication",
+      "projectName": "movieexplorer",
+      "args": "",
+      "envFile": "${workspaceFolder}/server/.env"
+    }
+  ]
+}
