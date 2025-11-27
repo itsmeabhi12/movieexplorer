@@ -59,9 +59,9 @@ public class AuditLogService {
                 .build();
     }
 
-    private String serializeObject(Object obj) {
+    private String serializeObject(Object object) {
         try {
-            return objectMapper.writeValueAsString(obj);
+            return objectMapper.writeValueAsString(object);
         } catch (Exception e) {
             return null;
         }

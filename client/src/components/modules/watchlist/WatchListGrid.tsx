@@ -1,94 +1,123 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import toast from "react-hot-toast";
+
 import getWatchList, {
-  removeFromWatchList,
+  removeFromWatchList as apiRemoveFromWatchList,
   updateWatchListItem,
 } from "@/src/api/watchlist";
+import { useAuth } from "@/src/lib/use-auth";
 import { WatchListItem } from "@/src/types/watchlist";
 
-import { useAuth } from "@/src/lib/use-auth";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
 import CircleButton from "../../common/CircleButton";
 import { CircularProgressIndicator } from "../../common/CircularProgressIndicator";
 import InputDialog from "../../common/InputDialog";
 import { MovieCard } from "../../common/MovieCard";
 
 export default function Watchlist() {
-  const [watchlist, setWatchlist] = useState<WatchListItem[]>([]);
-  const [isLoading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<WatchListItem | null>(null);
-  const [isDialogOpen, setDialogOpen] = useState(false);
-  const { isAuthenticated, isAuthCheckInProgress, logout } = useAuth();
   const router = useRouter();
+  const { isAuthenticated, isAuthCheckInProgress, logout } = useAuth();
 
-  async function fetchWatchList(silent = false) {
-    if (!silent) {
-      setLoading(true);
+  const [watchlist, setWatchlist] = useState<WatchListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<WatchListItem | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const fetchWatchList = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    try {
+      const { data, error } = await getWatchList();
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      if (data) {
+        setWatchlist(data);
+      }
+    } finally {
+      if (!silent) setIsLoading(false);
     }
-    const { data, error } = await getWatchList();
-    if (!silent) {
-      setLoading(false);
-    }
-    if (data) {
-      setWatchlist(data);
-    } else if (error) {
-      toast.error(error.message);
-    }
-  }
+  }, []);
 
   useEffect(() => {
     if (isAuthCheckInProgress) return;
+
     if (isAuthenticated) {
-      fetchWatchList();
+      void fetchWatchList();
     } else {
       router.push("/");
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isAuthCheckInProgress, fetchWatchList, router]);
 
-  async function removeFromWatchlist(item: WatchListItem) {
-    const result = await removeFromWatchList(item.id);
-    if (result.error) {
-      toast.error("Failed to remove: " + result.error.message);
-      return;
-    }
-    fetchWatchList(true);
-    toast.success("Removed from watchlist");
-  }
+  const handleRemove = useCallback(
+    async (item: WatchListItem) => {
+      const result = await apiRemoveFromWatchList(item.id);
+      if (result.error) {
+        toast.error("Failed to remove: " + result.error.message);
+        return;
+      }
+      toast.success("Removed from watchlist");
+      void fetchWatchList(true);
+    },
+    [fetchWatchList]
+  );
 
-  async function update(item: WatchListItem, notes: string) {
-    setDialogOpen(false);
-    const { data, error } = await updateWatchListItem(item.id, notes);
-    if (data) {
-      toast.success("Notes updated");
-      fetchWatchList(true);
-    } else if (error) {
-      toast.error("Failed to update notes: " + error.message);
-    }
-  }
+  const handleUpdateNotes = useCallback(
+    async (item: WatchListItem, notes: string) => {
+      setIsDialogOpen(false);
+      const { data, error } = await updateWatchListItem(item.id, notes);
+      if (error) {
+        toast.error("Failed to update notes: " + error.message);
+        return;
+      }
+      if (data) {
+        toast.success("Notes updated");
+        void fetchWatchList(true);
+      }
+    },
+    [fetchWatchList]
+  );
+
+  const handleHomeClick = useCallback(() => {
+    router.push("/");
+  }, [router]);
+
+  const handleLogoutClick = useCallback(async () => {
+    await logout();
+    router.push("/");
+    toast.success("Logged out successfully");
+  }, [logout, router]);
+
+  const handleCardClick = useCallback((item: WatchListItem) => {
+    setSelectedItem(item);
+    setIsDialogOpen(true);
+  }, []);
+
+  const handleDialogClose = useCallback(() => {
+    setIsDialogOpen(false);
+  }, []);
+
+  const handleDialogSave = useCallback(
+    (note: string) => {
+      if (!selectedItem) {
+        toast.error("No item selected");
+        return;
+      }
+      void handleUpdateNotes(selectedItem, note);
+    },
+    [handleUpdateNotes, selectedItem]
+  );
 
   return (
     <>
-      <div className=" flex w-full justify-between text-left text-7xl font-semibold mb-4 mt-10">
+      <div className="flex w-full justify-between text-left text-7xl font-semibold mb-4 mt-10">
         <div className="ml-10">Your Watchlist</div>
 
         <div className="flex text-xl mr-10 gap-5">
-          <CircleButton
-            onClick={() => {
-              router.push("/");
-            }}
-            icon="🏠"
-          ></CircleButton>
-          <CircleButton
-            onClick={() => {
-              logout().then(() => {
-                router.push("/");
-                toast.success("Logged out successfully");
-              });
-            }}
-            icon="➡️"
-          ></CircleButton>
+          <CircleButton onClick={handleHomeClick} icon="🏠" />
+          <CircleButton onClick={handleLogoutClick} icon="➡️" />
         </div>
       </div>
 
@@ -101,27 +130,24 @@ export default function Watchlist() {
 
         {!isLoading &&
           watchlist.length > 0 &&
-          watchlist.map((movie) => (
+          watchlist.map((item) => (
             <MovieCard
-              key={movie.id}
+              key={item.id}
               buttonIcon="🖊️"
               showDeleteButton={true}
-              onDelete={() => removeFromWatchlist(movie)}
-              id={movie.movie.id}
-              title={movie.movie.title ?? "Untitled"}
-              posterPath={movie.movie.poster_path ?? ""}
-              onClick={() => {
-                setSelected(movie);
-                setDialogOpen(true);
-              }}
+              onDelete={() => handleRemove(item)}
+              id={item.movie.id}
+              title={item.movie.title ?? "Untitled"}
+              posterPath={item.movie.poster_path ?? ""}
+              onClick={() => handleCardClick(item)}
             />
           ))}
 
         <InputDialog
           isOpen={isDialogOpen}
-          initialValue={selected?.notes ?? ""}
-          onClose={() => setDialogOpen(false)}
-          onSave={(note) => update(selected!, note)}
+          initialValue={selectedItem?.notes ?? ""}
+          onClose={handleDialogClose}
+          onSave={handleDialogSave}
         />
       </div>
     </>

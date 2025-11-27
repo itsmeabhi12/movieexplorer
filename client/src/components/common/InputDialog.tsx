@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PrimaryButton } from "./PrimaryButton";
 
 export default function InputDialog({
   initialValue,
@@ -60,23 +61,23 @@ export default function InputDialog({
                 placeholder="Type your notes..."
               />
 
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  onClick={() => {
+              <div className="flex justify-end gap-4">
+                <PrimaryButton
+                  title={closeTitle ?? "Cancel"}
+                  onTap={() => {
                     setNotes("");
                     onClose();
                   }}
-                  className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 focus:outline-none"
-                >
-                  {closeTitle ?? "Cancel"}
-                </button>
+                  isLoading={false}
+                />
 
-                <button
-                  onClick={handleOk}
-                  className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none"
-                >
-                  OK
-                </button>
+                <PrimaryButton
+                  title="OK"
+                  onTap={() => {
+                    handleOk();
+                  }}
+                  isLoading={false}
+                />
               </div>
             </div>
           </div>

@@ -9,7 +9,10 @@ import com.abhishek.movieexplorer.dto.response.MovieDTO;
 import com.abhishek.movieexplorer.dto.response.MovieSearchResponse;
 import com.abhishek.movieexplorer.exception.TmdbApiException;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 public class TmdbService {
 
     final private String baseUrl;
@@ -34,6 +37,7 @@ public class TmdbService {
                     .toUriString();
             return restTemplate.getForObject(url, MovieSearchResponse.class);
         } catch (Exception e) {
+            log.error(e.getMessage());
             throw new TmdbApiException(e.getMessage());
         }
 
@@ -49,6 +53,7 @@ public class TmdbService {
                     .toUriString();
             return restTemplate.getForObject(url, MovieSearchResponse.class);
         } catch (Exception e) {
+            log.error(e.getMessage());
             throw new TmdbApiException(e.getMessage());
         }
     }
@@ -61,6 +66,7 @@ public class TmdbService {
                     .toUriString();
             return restTemplate.getForObject(url, MovieDTO.class);
         } catch (Exception e) {
+            log.error(e.getMessage());
             throw new TmdbApiException(e.getMessage());
         }
     }

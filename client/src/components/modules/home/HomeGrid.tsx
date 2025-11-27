@@ -5,7 +5,7 @@ import { addToWatchList } from "@/src/api/watchlist";
 import { useAuth } from "@/src/lib/use-auth";
 import { Movie } from "@/src/types/movie";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import CircleButton from "../../common/CircleButton";
 import { CircularProgressIndicator } from "../../common/CircularProgressIndicator";
@@ -15,128 +15,186 @@ import { PrimaryButton } from "../../common/PrimaryButton";
 import { SearchBar } from "../../common/SearchBar";
 import { AuthDialog } from "./AuthDialog";
 
+const PAGE_SIZE = 20;
+
 export function HomeGrid({ initialMovies }: { initialMovies: Movie[] }) {
-  const [movies, setMovies] = useState(initialMovies);
-  const [isLoading, setLoading] = useState(false);
-  const [isLoadingMore, setLoadingMore] = useState(false);
-  const { isAuthenticated, checkAuthenticatedStatus } = useAuth();
-  const [isAuthOpen, setAuthOpen] = useState(false);
-  const [isDialogOpen, setDialogOpen] = useState(false);
-  const [selected, setSelected] = useState<Movie | null>(null);
-  const [query, setQuery] = useState<string | null>(null);
-
-  const firstLoad = useRef(true);
   const router = useRouter();
+  const { isAuthenticated, checkAuthenticatedStatus } = useAuth();
 
-  async function handleSearch(query: string) {
-    setLoading(true);
+  const [movies, setMovies] = useState<Movie[]>(initialMovies);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [query, setQuery] = useState<string | null>(null);
+  const [hasReachedEnd, setHasReachedEnd] = useState(false);
 
-    const { data, error } = query.trim()
-      ? await searchMovies(1, query)
-      : await getMovies(1);
-    if (data) {
-      setMovies(data.results);
-    } else if (error) {
-      toast.error(error.message);
-    }
-    setLoading(false);
-  }
+  const isFirstQueryChange = useRef(true);
+
+  const fetchMoviesPage = useCallback(
+    async (page: number, q?: string | null) => {
+      const trimmed = (q ?? "").trim();
+      return trimmed ? searchMovies(page, trimmed) : getMovies(page);
+    },
+    []
+  );
+
+  const handleSearch = useCallback(
+    async (q: string) => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await fetchMoviesPage(1, q);
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+        if (data) {
+          setMovies(data.results);
+          setHasReachedEnd(data.results.length < PAGE_SIZE);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [fetchMoviesPage]
+  );
 
   useEffect(() => {
     if (query === null) return;
-    if (firstLoad.current) {
-      firstLoad.current = false;
+    if (isFirstQueryChange.current) {
+      isFirstQueryChange.current = false;
       return;
     }
-    handleSearch(query ?? "");
-  }, [query]);
+    void handleSearch(query ?? "");
+  }, [query, handleSearch]);
 
-  async function handleAddToWatchlist(movie: Movie, notes: string) {
-    if (isAuthenticated) {
-      addToWatchList(movie, notes).then((result) => {
-        if (result.error) {
-          toast.error("Failed to add to watchlist: " + result.error.message);
-          return;
-        }
-        toast.success("Added to watchlist");
-      });
+  const handleProfileClick = useCallback(() => {
+    if (!isAuthenticated) {
+      setIsAuthOpen(true);
     } else {
-      toast.error("Please login first");
+      router.push("/watchlist");
     }
-  }
+  }, [isAuthenticated, router]);
 
-  async function loadMore() {
-    setLoadingMore(true);
-    const { data, error } = query?.trim()
-      ? await searchMovies(Math.floor(movies.length / 20) + 1, query)
-      : await getMovies(Math.floor(movies.length / 20) + 1);
-    if (data) {
-      setMovies((prev) => [...prev, ...data.results]);
-    } else if (error) {
-      toast.error("Failed to load more: " + error.message);
+  const handleMovieClick = useCallback(
+    (movie: Movie) => {
+      if (!isAuthenticated) {
+        toast.error("Please login first");
+        return;
+      }
+      setSelectedMovie(movie);
+      setIsDialogOpen(true);
+    },
+    [isAuthenticated]
+  );
+
+  const handleAddToWatchlist = useCallback(
+    async (movie: Movie, notes: string) => {
+      if (!isAuthenticated) {
+        toast.error("Please login first");
+        return;
+      }
+      const result = await addToWatchList(movie, notes);
+      if (result.error) {
+        toast.error("Failed to add to watchlist: " + result.error.message);
+        return;
+      }
+      toast.success("Added to watchlist");
+    },
+    [isAuthenticated]
+  );
+
+  const handleSaveNotes = useCallback(
+    async (note: string) => {
+      if (!selectedMovie) {
+        toast.error("No movie selected");
+        return;
+      }
+      await handleAddToWatchlist(selectedMovie, note);
+      setIsDialogOpen(false);
+    },
+    [handleAddToWatchlist, selectedMovie]
+  );
+
+  const loadMore = useCallback(async () => {
+    if (hasReachedEnd || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const nextPage = Math.floor(movies.length / PAGE_SIZE) + 1;
+      const { data, error } = await fetchMoviesPage(nextPage, query);
+      if (error) {
+        toast.error("Failed to load more: " + error.message);
+        return;
+      }
+      if (data) {
+        setMovies((prev) => [...prev, ...data.results]);
+        setHasReachedEnd(data.results.length < PAGE_SIZE);
+      }
+    } finally {
+      setIsLoadingMore(false);
     }
-    setLoadingMore(false);
-  }
+  }, [fetchMoviesPage, hasReachedEnd, isLoadingMore, movies.length, query]);
+
+  const handleAuthClose = useCallback(() => {
+    checkAuthenticatedStatus();
+    setIsAuthOpen(false);
+  }, [checkAuthenticatedStatus]);
+
+  const handleDialogClose = useCallback(() => {
+    setIsDialogOpen(false);
+  }, []);
+
+  const handleSearchInput = useCallback((value: string) => {
+    setQuery(value);
+  }, []);
 
   return (
     <div>
       <div className="flex justify-between p-4">
-        <div></div>
-        <SearchBar onSearch={(e) => setQuery(e)}></SearchBar>
-
+        <div />
+        <SearchBar onSearch={handleSearchInput} />
         <CircleButton
-          icon={"🙍🏻‍♂️"}
+          icon="🙍🏻‍♂️"
           online={isAuthenticated}
-          onClick={() => {
-            if (!isAuthenticated) {
-              setAuthOpen(true);
-            } else {
-              router.push("/watchlist");
-            }
-          }}
+          onClick={handleProfileClick}
         />
       </div>
-      <div className="flex flex-wrap justify-center content-center gap-4 p-4">
+
+      <div className="grid p-10 gap-10 grid-cols-[repeat(auto-fill,minmax(180px,1fr))] place-items-center">
         {isLoading ? (
-          <CircularProgressIndicator />
+          <div className="col-span-full">
+            <CircularProgressIndicator />
+          </div>
         ) : (
-          movies.map((e) => (
+          movies.map((m) => (
             <MovieCard
-              key={e.id}
-              id={e.id}
-              title={e.title}
-              posterPath={e.poster_path}
-              onClick={(_) => {
-                setSelected(e);
-                setDialogOpen(true);
-              }}
-            ></MovieCard>
+              key={m.id}
+              id={m.id}
+              title={m.title}
+              posterPath={m.poster_path}
+              onClick={() => handleMovieClick(m)}
+            />
           ))
         )}
       </div>
-      {!isLoading && movies.length !== 0 && (
-        <div className=" flex justify-center mb-4">
+
+      {!isLoading && movies.length !== 0 && !hasReachedEnd && (
+        <div className="flex justify-center mb-4">
           <PrimaryButton
             title="LoadMore"
             isLoading={isLoadingMore}
-            onTap={() => {
-              loadMore();
-            }}
+            onTap={loadMore}
           />
         </div>
       )}
-      <AuthDialog
-        isOpen={isAuthOpen}
-        onClose={function () {
-          checkAuthenticatedStatus();
-          return setAuthOpen(false);
-        }}
-      />
+
+      <AuthDialog isOpen={isAuthOpen} onClose={handleAuthClose} />
 
       <InputDialog
         isOpen={isDialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onSave={(note) => handleAddToWatchlist(selected!, note)}
+        onClose={handleDialogClose}
+        onSave={handleSaveNotes}
       />
     </div>
   );

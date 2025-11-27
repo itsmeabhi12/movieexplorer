@@ -21,7 +21,7 @@ export function MovieCard({
   onDelete,
 }: MovieCardProps) {
   return (
-    <div className="h-100 w-50 rounded-[12px] overflow-hidden relative group">
+    <div className="h-100 w-50 rounded-xl overflow-hidden relative group">
       <div className="relative w-full h-full">
         <Image
           src={process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL + posterPath}
