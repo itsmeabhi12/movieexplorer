@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.abhishek.movieexplorer.context.RequestContext;
@@ -20,7 +21,7 @@ public class AuditLogService {
     final AuditLogRepository auditLogRepository;
     final ObjectMapper objectMapper;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logCreateAction(Object newObject, UUID actorId, AuditLog.TargetType targetType,
             String targetId) {
         AuditLog auditLog = base(AuditLog.Action.CREATE, actorId, targetType, targetId);
@@ -29,7 +30,7 @@ public class AuditLogService {
         auditLogRepository.save(auditLog);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logUpdateAction(Object previousObject, Object newObject, UUID actorId,
             AuditLog.TargetType targetType, String targetId, Map<String, Object> diff) {
         AuditLog auditLog = base(AuditLog.Action.UPDATE, actorId, targetType, targetId);
@@ -40,7 +41,7 @@ public class AuditLogService {
         auditLogRepository.save(auditLog);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logDeleteAction(Object previousObject, UUID actorId, AuditLog.TargetType targetType,
             String targetId) {
         AuditLog auditLog = base(AuditLog.Action.DELETE, actorId, targetType, targetId);
