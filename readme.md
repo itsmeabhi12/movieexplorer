@@ -6,6 +6,12 @@ Monorepo with:
 - `server/` (Spring Boot backend)
 - PostgreSQL (via Docker Compose)
 
+## Requirements
+
+- Java 17 or higher
+- Node.js 21 or higher
+- Docker and Docker Compose
+
 ## Quick Start
 
 1. Start PostgreSQL
@@ -20,6 +26,7 @@ docker compose up -d
 
 ```bash
 Use a Spring Boot extension to run backend in VSCode or Intellij
+Requires Java 17+
 ```
 
 3. Run frontend
@@ -28,6 +35,7 @@ Use a Spring Boot extension to run backend in VSCode or Intellij
 cd client
 npm i
 npm run dev
+Requires Node.js 21+
 ```
 
 ## Environment Variables
