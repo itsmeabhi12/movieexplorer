@@ -69,13 +69,3 @@ Run Database(from Docker) first as it will load .env
 NEXT_PUBLIC_API_URL=http://localhost:8080
 NEXT_PUBLIC_TMDB_IMAGE_BASE_URL=https://image.tmdb.org/t/p/w342
 ```
-
-## Folder Structure
-
-```
-/
-├─ client/        # Next.js app
-├─ server/        # Spring Boot app
-├─ docker-compose.yml
-└─ README.md
-```
